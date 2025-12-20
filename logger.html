@@ -2,143 +2,126 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Advanced Browser Telemetry Test</title>
-    <style>body { font-family: sans-serif; background: #121212; color: #00ff00; padding: 20px; }</style>
+    <title>Mega Max Browser Forensic Lab</title>
+    <style>
+        body { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; padding: 20px; line-height: 1.4; }
+        .red { color: #ff003c; font-weight: bold; }
+        #log { border: 1px solid #333; padding: 10px; height: 400px; overflow-y: auto; background: #000; margin-top: 10px; font-size: 12px; }
+        h1 { border-bottom: 2px solid #00ff41; padding-bottom: 5px; }
+    </style>
 </head>
 <body>
-    <h2>System Analysis in Progress...</h2>
-    <div id="status">Gathering deep forensics...</div>
+    <h1>SYSTEM FORENSICS: ACTIVE</h1>
+    <div id="status">Analyzing browser internals...</div>
+    <div id="log"></div>
 
     <script>
-        const WEBHOOK_URL = 'https://webhook.site/fae9de04-a4de-414a-ad67-1ebc06dc1c62';
+        const WEBHOOK_URL = 'YOUR_WEBHOOK_URL_HERE';
+        const report = { redFlags: [], hardware: {}, software: {}, fingerprints: {}, timing: {} };
 
-        async function getDeepForensics() {
-            const telemetry = {
-                id: Math.random().toString(36).substring(7),
-                capturedAt: new Date().toISOString(),
-                
-                // 1. HARDWARE CORE
-                hardware: {
-                    cpus: navigator.hardwareConcurrency,
-                    ram_approx: navigator.deviceMemory,
-                    platform: navigator.platform,
-                    touchPoints: navigator.maxTouchPoints,
-                    videocard: getGPUInfo(),
-                },
+        function log(msg, isError = false) {
+            const div = document.createElement('div');
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${isError ? '<span class="red">!!</span> ' : '> '}${msg}`;
+            document.getElementById('log').appendChild(div);
+        }
 
-                // 2. BATTERY & POWER (Chromium only)
-                battery: await getBatteryData(),
+        async function runForensics() {
+            log("Initiating Deep Scan...");
 
-                // 3. NETWORK & CONNECTIVITY
-                network: {
-                    ip_local_hint: await getLocalIPs(), // Using WebRTC leak technique
-                    connection: navigator.connection ? {
-                        type: navigator.connection.effectiveType,
-                        downlink: navigator.connection.downlink,
-                        rtt: navigator.connection.rtt
-                    } : 'Hidden',
-                    online: navigator.onLine
-                },
-
-                // 4. BIOMETRIC SIGNATURES (Fingerprinting)
-                fingerprints: {
-                    canvas: getCanvasFingerprint(),
-                    audio: await getAudioFingerprint(),
-                    fonts: getFontFingerprint()
-                },
-
-                // 5. SOFTWARE ENVIRONMENT
-                software: {
-                    userAgent: navigator.userAgent,
-                    languages: navigator.languages,
-                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    cookies: navigator.cookieEnabled,
-                    pdfViewer: navigator.pdfViewerEnabled,
-                    webdriver: navigator.webdriver // Detects if browser is automated
-                },
-
-                // 6. DISPLAY & CSS CAPABILITIES
-                display: {
-                    res: `${screen.width}x${screen.height}`,
-                    depth: screen.colorDepth,
-                    hdr_support: window.matchMedia('(dynamic-range: high)').matches,
-                    reduced_motion: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            // --- 1. PROTOTYPE TAMPERING (The "Liar" Check) ---
+            // Antidetect browsers "wrap" native functions. We check for non-native strings.
+            try {
+                const checkNative = (obj, method) => {
+                    const str = obj[method].toString();
+                    return str.includes('[native code]') && !str.includes('proxied');
+                };
+                report.integrity = {
+                    canvasNative: checkNative(HTMLCanvasElement.prototype, 'toDataURL'),
+                    audioNative: checkNative(AudioContext.prototype, 'createOscillator'),
+                    navigatorNative: checkNative(Object.getPrototypeOf(navigator), 'userAgent')
+                };
+                if (Object.values(report.integrity).some(v => v === false)) {
+                    report.redFlags.push("FUNCTION_WRAPPING_DETECTED");
+                    log("Tampering detected in Native APIs!", true);
                 }
-            };
+            } catch(e) {}
 
-            sendData(telemetry);
-        }
+            // --- 2. HARDWARE CONCURRENCY: THE THREAD TRAP ---
+            // Antidetect says "2 cores," but we try to spawn 20 workers.
+            log("Testing physical CPU limits...");
+            const workerTest = await new Promise(resolve => {
+                let workers = [];
+                try {
+                    for (let i = 0; i < 20; i++) {
+                        workers.push(new Worker(URL.createObjectURL(new Blob(['']))));
+                    }
+                } catch (e) {}
+                const actual = workers.length;
+                workers.forEach(w => w.terminate());
+                resolve(actual);
+            });
+            report.hardware.reportedCores = navigator.hardwareConcurrency;
+            report.hardware.actualSpawned = workerTest;
+            if (workerTest > navigator.hardwareConcurrency) {
+                report.redFlags.push("CPU_CORES_SPOOFED");
+                log(`CPU Mismatch: Claims ${navigator.hardwareConcurrency}, actually supports ${workerTest}+`, true);
+            }
 
-        // --- SUB-ROUTINES ---
-
-        function getGPUInfo() {
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl');
-                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                return debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Generic';
-            } catch(e) { return 'Blocked'; }
-        }
-
-        async function getBatteryData() {
-            if (!navigator.getBattery) return 'Not Supported';
-            const b = await navigator.getBattery();
-            return { level: b.level * 100 + '%', charging: b.charging };
-        }
-
-        function getCanvasFingerprint() {
+            // --- 3. GPU ARCHITECTURE (WebGL Side-Channel) ---
             const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.textBaseline = "top";
-            ctx.font = "14px 'Arial'";
-            ctx.fillStyle = "#f60";
-            ctx.fillRect(125,1,62,20);
-            ctx.fillStyle = "#069";
-            ctx.fillText("BrowserForensics!", 2, 15);
-            return canvas.toDataURL().slice(-50); // Send hash snippet
+            const gl = canvas.getContext('webgl');
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            report.hardware.gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
+            
+            // Performance Benchmark: A real GPU clears a buffer instantly.
+            const t0 = performance.now();
+            for(let i=0; i<10000; i++) gl.clear(gl.COLOR_BUFFER_BIT);
+            report.timing.gpuBenchmark = (performance.now() - t0).toFixed(2) + "ms";
+
+            // --- 4. THE "HIDDEN" NETWORK (WebRTC) ---
+            log("Probing WebRTC for IP leaks...");
+            report.network = { localIPs: await getIPs() };
+
+            // --- 5. FONT & MEDIA ENUMERATION ---
+            report.software.fonts = ['Consolas', 'Ubuntu', 'Helvetica Neue', 'Arial'].filter(f => document.fonts.check(`12px "${f}"`));
+            
+            // --- 6. BEHAVIORAL: WINDOW GEOMETRY ---
+            // If it's "Mobile" but window.innerWidth is 1920, it's a lie.
+            report.software.isMobile = /Mobi|Android/i.test(navigator.userAgent);
+            report.software.resMismatch = (report.software.isMobile && window.innerWidth > 1000);
+            if (report.software.resMismatch) report.redFlags.push("MOBILE_UA_ON_DESKTOP_RES");
+
+            // Final Send
+            log("Full diagnostic package ready. Transmitting...");
+            sendReport();
         }
 
-        async function getAudioFingerprint() {
-            try {
-                const context = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
-                const oscillator = context.createOscillator();
-                oscillator.type = 'triangle';
-                oscillator.frequency.setValueAtTime(10000, context.currentTime);
-                oscillator.connect(context.destination);
-                oscillator.start(0);
-                const buffer = await context.startRendering();
-                return buffer.getChannelData(0).slice(400, 405).toString(); // Unique sound processing values
-            } catch(e) { return 'Audio Blocked'; }
-        }
-
-        function getFontFingerprint() {
-            // Checks for common vs rare fonts to build a profile
-            const fontList = ['Comic Sans MS', 'Adobe Blank', 'Ubuntu', 'Consolas'];
-            return fontList.filter(font => document.fonts.check(`12px "${font}"`));
-        }
-
-        async function getLocalIPs() {
+        async function getIPs() {
             return new Promise(resolve => {
                 const ips = [];
-                const pc = new RTCPeerConnection({ iceServers: [] });
+                const pc = new RTCPeerConnection({iceServers: []});
                 pc.createDataChannel("");
                 pc.createOffer().then(o => pc.setLocalDescription(o));
                 pc.onicecandidate = (i) => {
-                    if (!i || !i.candidate || !i.candidate.candidate) return resolve(ips);
-                    const ip = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/.exec(i.candidate.candidate);
-                    if (ip) ips.push(ip[1]);
+                    if (!i.candidate) resolve(ips);
+                    const match = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(i.candidate.candidate);
+                    if (match && !ips.includes(match[1])) ips.push(match[1]);
                 };
-                setTimeout(() => resolve(ips), 500);
+                setTimeout(() => resolve(ips), 800);
             });
         }
 
-        function sendData(data) {
-            fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
-            document.getElementById('status').innerText = "Data Transmitted. Check Webhook.site.";
-            console.log("Full Report:", data);
+        function sendReport() {
+            fetch(WEBHOOK_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ ...report, userAgent: navigator.userAgent })
+            });
+            document.getElementById('status').innerText = "FORENSICS SENT TO WEBHOOK.";
+            log("Check Webhook.site dashboard for the 'redFlags' array.");
         }
 
-        window.onload = getDeepForensics;
+        window.onload = runForensics;
     </script>
 </body>
 </html>
